@@ -8,8 +8,6 @@
   <style>
     :root{
       --accent-gradient: linear-gradient(90deg, #FF3D3D 0%, #FF914D 100%);
-      /* faint gradient overlay (very low opacity) + fallback black */
-      --bg-gradient: linear-gradient(90deg, rgba(255,61,61,0.06), rgba(255,145,77,0.06));
       --bg-color: #000;
       --text: #e6e6e6;
       --muted: #bdbdbd;
@@ -18,28 +16,11 @@
 
     /* Reset / base */
     * { box-sizing: border-box; }
-    html,body {
-      height:100vh;
-      margin:0;
-      /* make page non-scrollable */
-      overflow: hidden;
-      background: var(--bg-gradient), var(--bg-color);
-      color:var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      -webkit-font-smoothing:antialiased;
-      -moz-osx-font-smoothing:grayscale;
-    }
+    html,body { height:100%; margin:0; background:var(--bg-color); color:var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
     a { text-decoration: none; }
 
-    /* Page layout - centered and clipped (no scroll) */
-    .page {
-      height:100vh;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      padding:32px 20px;
-    }
-
+    /* Page layout */
+    .page { min-height:100vh; display:flex; align-items:flex-start; justify-content:center; padding:56px 20px; }
     .container {
       width:100%;
       max-width: var(--max-width);
@@ -47,9 +28,7 @@
       display:flex;
       flex-direction:column;
       align-items:center;
-      gap: 20px;
-      /* ensure the container never forces scroll */
-      max-height: calc(100vh - 64px);
+      gap: 22px;
     }
 
     /* Photo: centered medium size with slightly rounded corners */
@@ -57,7 +36,7 @@
       width: 200px;
       height: 200px;
       object-fit: cover;
-      border-radius: 12px;
+      border-radius: 12px;                /* slightly rounded corners */
       border: 1px solid rgba(255,255,255,0.06);
       box-shadow: 0 10px 30px rgba(0,0,0,0.6);
       background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
@@ -71,25 +50,19 @@
       color: var(--muted);
       line-height:1.55;
       text-align: left;
-      overflow: hidden;            /* makes sure inner content won't scroll */
-      text-overflow: ellipsis;
     }
 
-    /* Slightly larger intro/current text (just a bit bigger) */
     .intro {
       margin: 8px 0 12px 0;
       color: var(--text);
-      font-size: 16px;            /* slightly bigger than default */
+      font-size: 15px;
     }
 
-    .current {
+    .current, .email {
       margin: 6px 0 12px 0;
       color: var(--muted);
-      font-size: 16px;            /* slightly bigger too */
+      font-size: 15px;
     }
-
-    /* keep smaller metadata readable */
-    .meta { font-size: 15px; color: var(--muted); }
 
     /* Gradient-accent links */
     .accent-link {
@@ -100,24 +73,24 @@
       color: transparent;
       font-weight: 600;
     }
+    /* For readability when clicked/visited keep subtle contrast */
     a.accent-link:visited { opacity: 0.95; }
 
     /* Lists */
     .content h3 { margin-top:14px; margin-bottom:8px; color:var(--text); font-size:15px; }
-    ul { margin:6px 0 12px 20px; padding:0; list-style: disc; }
+    ul { margin:6px 0 12px 20px; padding:0; }
     li { margin-bottom:8px; color:var(--muted); }
 
     /* label before link (bold part like "X: ") */
-    .social-label { color: var(--text); font-weight:600; margin-right:8px; }
+    .social-label { color: var(--text); font-weight:600; margin-right:6px; }
 
-    /* fallback link color on dark bg */
+    /* make non-gradient fallback link color readable on dark bg */
     a { color: #ffaf88; }
 
     /* small screen tweaks */
     @media (max-width:640px) {
       .photo { width:160px; height:160px; border-radius:10px; }
-      .intro, .current { font-size:15px; } /* keep it compact on very small screens */
-      .container { padding: 0 6px; gap:12px; }
+      .container { padding: 0 6px; }
     }
   </style>
 </head>
@@ -131,8 +104,7 @@
 
       <!-- Content area -->
       <div class="content">
-        <!-- Edited content: header removed per your request -->
-
+        <!-- ========== Text content (edited as requested) ========== -->
         <p class="intro">
           I'm Liana, a 14 y/o entrepreneur based in Sweden. I like reading, creating stuff online, and finding new things worth getting good at.
         </p>
@@ -174,7 +146,7 @@
             <a class="accent-link" href="mailto:roozbahaniliana@gmail.com">roozbahaniliana@gmail.com</a>
           </li>
         </ul>
-
+        <!-- ========== end content ========== -->
       </div>
     </div>
   </main>

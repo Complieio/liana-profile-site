@@ -28,6 +28,7 @@
       z-index: 0;              /* behind the page content */
       pointer-events: none;    /* won't block clicks */
       display:block;
+      background: transparent;
     }
 
     /* Page layout */
@@ -103,7 +104,7 @@
   </style>
 </head>
 <body>
-  <!-- Canvas for the orange "pixel" effect -->
+  <!-- Canvas for the small-square trail effect -->
   <canvas id="bgCanvas" aria-hidden="true"></canvas>
 
   <main class="page">
@@ -160,31 +161,24 @@
   </main>
 
   <script>
-    /* Minimal, performant grid-of-squares mouse-follow effect.
-       - Canvas is behind content (pointer-events:none)
-       - DevicePixelRatio aware
-       - Smooth mouse movement
-       - Works with mouse + touch
-    */
     (function () {
       const canvas = document.getElementById('bgCanvas');
       const ctx = canvas.getContext('2d', { alpha: true });
 
-      // Grid config (tweak to change look / density)
-      const CELL_SIZE = 10;      // base square size in px
-      const GAP = 6;             // gap between squares
-      const RADIUS = 220;        // influence radius in px
-      const PULSE = 0.8;         // strength of solo pulsing when not hovered
-      const HIGHLIGHT_SCALE = 2.2;// how much a cell can grow when hovered
+      // ---------- Tweak these to change the effect ----------
+      const SPAWN_COUNT = 3;        // how many squares to spawn per mousemove event (1-6)
+      const PARTICLE_MIN_SIZE = 6;  // px (small squares)
+      const PARTICLE_MAX_SIZE = 12; // px
+      const LIFESPAN_MIN = 300;     // ms
+      const LIFESPAN_MAX = 700;     // ms
+      const MAX_PARTICLES = 800;    // cap for performance
+      const FRICTION = 0.86;        // how quickly particles slow
+      // -----------------------------------------------------
 
       let DPR = Math.max(window.devicePixelRatio || 1, 1);
       let width = 0, height = 0;
-      let cells = []; // {x,y,baseSize,phase}
-
-      // mouse smoothing
-      const mouse = { x: -9999, y: -9999 };
-      const mouseTarget = { x: -9999, y: -9999 };
-      const mouseSmooth = { x: -9999, y: -9999 };
+      let particles = [];
+      let lastMouse = { x: -9999, y: -9999, t: performance.now() };
 
       function resize() {
         DPR = Math.max(window.devicePixelRatio || 1, 1);
@@ -195,107 +189,129 @@
         canvas.width = Math.round(width * DPR);
         canvas.height = Math.round(height * DPR);
         ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-        buildGrid();
       }
 
-      function buildGrid() {
-        cells = [];
-        const step = CELL_SIZE + GAP;
-        const cols = Math.ceil(width / step) + 1;
-        const rows = Math.ceil(height / step) + 1;
-        const offsetX = Math.floor((width - cols * step + step) / 2);
-        const offsetY = Math.floor((height - rows * step + step) / 2);
+      // create a single particle
+      function spawnParticle(x, y, vx = 0, vy = 0) {
+        if (particles.length >= MAX_PARTICLES) return;
+        const size = randRange(PARTICLE_MIN_SIZE, PARTICLE_MAX_SIZE);
+        const life = randRange(LIFESPAN_MIN, LIFESPAN_MAX);
+        // color blend between two oranges for slight variety
+        const colorA = [255, 61, 61];   // #FF3D3D
+        const colorB = [255, 145, 77];  // #FF914D
+        const mix = Math.random();
+        const r = Math.round(lerp(colorA[0], colorB[0], mix));
+        const g = Math.round(lerp(colorA[1], colorB[1], mix));
+        const b = Math.round(lerp(colorA[2], colorB[2], mix));
+        particles.push({
+          x, y,
+          vx: vx + randRange(-0.5, 0.5),
+          vy: vy + randRange(-0.5, 0.5),
+          size,
+          life,
+          age: 0,
+          rgb: [r, g, b]
+        });
+      }
 
-        for (let row = 0; row < rows; row++) {
-          for (let col = 0; col < cols; col++) {
-            const x = offsetX + col * step + step / 2;
-            const y = offsetY + row * step + step / 2;
-            cells.push({
-              x, y,
-              base: CELL_SIZE,
-              phase: Math.random() * Math.PI * 2  // for subtle pulsing
-            });
-          }
+      // spawn several based on movement speed and SPAWN_COUNT
+      function handleMove(clientX, clientY, movementX, movementY) {
+        // spawn a few squares at and near the pointer
+        const speed = Math.sqrt(movementX * movementX + movementY * movementY);
+        for (let i = 0; i < SPAWN_COUNT; i++) {
+          // slight random offset so squares don't overlap exactly
+          const ox = randRange(-4, 4);
+          const oy = randRange(-4, 4);
+          // velocity influenced by mouse movement for trailing
+          const vx = movementX * 0.15 + randRange(-0.6, 0.6);
+          const vy = movementY * 0.15 + randRange(-0.6, 0.6);
+          spawnParticle(clientX + ox, clientY + oy, vx, vy);
         }
       }
 
-      // color interpolation: from deep red -> bright orange
-      function colorFor(t, alpha) {
-        // t in [0,1]
-        const r = Math.round(140 + 115 * t); // 140 -> 255
-        const g = Math.round(20 + 80 * t);   // 20 -> 100
-        const b = Math.round(10 + 20 * t);   // 10 -> 30
-        return `rgba(${r},${g},${b},${alpha})`;
-      }
-
-      function draw(now) {
+      // animation frame
+      let last = performance.now();
+      function loop(now) {
+        const dt = now - last;
+        last = now;
+        // clear (leave transparent black background)
         ctx.clearRect(0, 0, width, height);
-        // smooth mouse
-        mouseSmooth.x += (mouseTarget.x - mouseSmooth.x) * 0.18;
-        mouseSmooth.y += (mouseTarget.y - mouseSmooth.y) * 0.18;
 
-        // time used for gentle pulsing
-        const t = now * 0.001;
+        // update & draw particles
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.age += dt;
+          if (p.age >= p.life) {
+            // remove
+            particles.splice(i, 1);
+            continue;
+          }
+          // update physics
+          p.vx *= FRICTION;
+          p.vy *= FRICTION;
+          p.x += p.vx * (dt / 16.67); // normalize per-frame (60fps base)
+          p.y += p.vy * (dt / 16.67);
 
-        for (let i = 0; i < cells.length; i++) {
-          const c = cells[i];
-          const dx = mouseSmooth.x - c.x;
-          const dy = mouseSmooth.y - c.y;
-          const d = Math.sqrt(dx * dx + dy * dy);
-          const influence = Math.max(0, 1 - d / RADIUS); // 0..1
+          // visual alpha: fade out over lifetime
+          const alpha = 1 - (p.age / p.life);
 
-          // base size with subtle pulse
-          const pulse = 1 + Math.sin(c.phase + t * 1.6) * (PULSE * 0.08);
-          // interactive scale based on influence
-          const scale = 1 + influence * (HIGHLIGHT_SCALE - 1);
-          const size = c.base * pulse * scale;
-
-          // color strength and alpha
-          const colStrength = Math.min(1, influence * 1.25);
-          // fallback small visibility for non-influenced squares (keeps texture)
-          const alpha = 0.05 + colStrength * 0.95;
-
-          // Slight rounding and corner to look more like squares in screenshot
-          ctx.beginPath();
-          ctx.fillStyle = colorFor(colStrength, alpha);
-          const half = size / 2;
-          // draw rect centered at (c.x, c.y)
-          ctx.fillRect(Math.round(c.x - half), Math.round(c.y - half), Math.round(size), Math.round(size));
+          // draw square with crisp edges (use integer coords)
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = `rgb(${p.rgb[0]},${p.rgb[1]},${p.rgb[2]})`;
+          const s = Math.round(p.size);
+          // center the square at (p.x, p.y)
+          ctx.fillRect(Math.round(p.x - s / 2), Math.round(p.y - s / 2), s, s);
         }
 
-        requestAnimationFrame(draw);
+        ctx.globalAlpha = 1;
+        requestAnimationFrame(loop);
       }
 
-      // Events
+      // pointer events
+      let lastEvent = null;
       window.addEventListener('mousemove', (e) => {
-        mouseTarget.x = e.clientX;
-        mouseTarget.y = e.clientY;
+        const mx = e.clientX;
+        const my = e.clientY;
+        let movementX = 0, movementY = 0;
+        if (lastEvent) {
+          movementX = mx - lastEvent.clientX;
+          movementY = my - lastEvent.clientY;
+        }
+        handleMove(mx, my, movementX, movementY);
+        lastEvent = e;
       }, { passive: true });
 
       window.addEventListener('touchstart', (e) => {
-        if (e.touches && e.touches[0]) {
-          mouseTarget.x = e.touches[0].clientX;
-          mouseTarget.y = e.touches[0].clientY;
-        }
+        if (!e.touches || !e.touches[0]) return;
+        const t = e.touches[0];
+        handleMove(t.clientX, t.clientY, 0, 0);
       }, { passive: true });
 
       window.addEventListener('touchmove', (e) => {
-        if (e.touches && e.touches[0]) {
-          mouseTarget.x = e.touches[0].clientX;
-          mouseTarget.y = e.touches[0].clientY;
+        if (!e.touches || !e.touches[0]) return;
+        const t = e.touches[0];
+        // we cannot rely on movementX in touch, so compute from lastEvent
+        let movementX = 0, movementY = 0;
+        if (lastEvent && lastEvent.touches && lastEvent.touches[0]) {
+          movementX = t.clientX - lastEvent.touches[0].clientX;
+          movementY = t.clientY - lastEvent.touches[0].clientY;
         }
+        handleMove(t.clientX, t.clientY, movementX, movementY);
+        lastEvent = e;
       }, { passive: true });
 
-      // When mouse leaves, push it far away so effect fades
       window.addEventListener('mouseleave', () => {
-        mouseTarget.x = -9999;
-        mouseTarget.y = -9999;
+        lastEvent = null;
       });
 
-      // Initial setup
+      // small helpers
+      function randRange(a, b) { return a + Math.random() * (b - a); }
+      function lerp(a, b, t) { return a + (b - a) * t; }
+
+      // initialize
       resize();
       window.addEventListener('resize', resize, { passive: true });
-      requestAnimationFrame(draw);
+      requestAnimationFrame(loop);
     })();
   </script>
 </body>

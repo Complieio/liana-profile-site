@@ -52,19 +52,6 @@
       text-align: left;
     }
 
-    .name {
-      margin: 6px 0 10px 0;
-      font-size: 22px;
-      font-weight: 700;
-      letter-spacing: -0.2px;
-      /* gradient text for the primary accent */
-      background: var(--accent-gradient);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      color: transparent;
-    }
-
     .intro {
       margin: 8px 0 12px 0;
       color: var(--text);
@@ -82,6 +69,7 @@
       background: var(--accent-gradient);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
+      background-clip: text;
       color: transparent;
       font-weight: 600;
     }
@@ -93,13 +81,15 @@
     ul { margin:6px 0 12px 20px; padding:0; }
     li { margin-bottom:8px; color:var(--muted); }
 
-    /* make code/links accessible on dark bg when not using gradient */
+    /* label before link (bold part like "X: ") */
+    .social-label { color: var(--text); font-weight:600; margin-right:6px; }
+
+    /* make non-gradient fallback link color readable on dark bg */
     a { color: #ffaf88; }
 
     /* small screen tweaks */
     @media (max-width:640px) {
       .photo { width:160px; height:160px; border-radius:10px; }
-      .name { font-size:20px; }
       .container { padding: 0 6px; }
     }
   </style>
@@ -114,9 +104,7 @@
 
       <!-- Content area -->
       <div class="content">
-        <!-- --- START: replaceable content --- -->
-        <h1 class="name">I'm Liana</h1>
-
+        <!-- ========== Text content (edited as requested) ========== -->
         <p class="intro">
           I'm Liana, a 14 y/o entrepreneur based in Sweden. I like reading, creating stuff online, and finding new things worth getting good at.
         </p>
@@ -137,13 +125,28 @@
 
         <h3>Socials</h3>
         <ul>
-          <li>X: <a class="accent-link" href="https://x.com/Lianarooz" target="_blank" rel="noopener">https://x.com/Lianarooz</a></li>
-          <li>LinkedIn: <a class="accent-link" href="https://www.linkedin.com/in/liana-roozbahani-998956353/" target="_blank" rel="noopener">https://www.linkedin.com/in/liana-roozbahani-998956353/</a></li>
-          <li>Instagram: <a class="accent-link" href="https://www.instagram.com/lianaroozbahani/" target="_blank" rel="noopener">https://www.instagram.com/lianaroozbahani/</a></li>
-          <li>GitHub: <a class="accent-link" href="https://github.com/Complieio" target="_blank" rel="noopener">https://github.com/Complieio</a></li>
-          <li>Email: <a class="accent-link" href="mailto:roozbahaniliana@gmail.com">roozbahaniliana@gmail.com</a></li>
+          <li>
+            <span class="social-label">X:</span>
+            <a class="accent-link" href="https://x.com/Lianarooz" target="_blank" rel="noopener">@Lianarooz</a>
+          </li>
+          <li>
+            <span class="social-label">LinkedIn:</span>
+            <a class="accent-link" href="https://www.linkedin.com/in/liana-roozbahani-998956353/" target="_blank" rel="noopener">Liana Roozbahani</a>
+          </li>
+          <li>
+            <span class="social-label">Instagram:</span>
+            <a class="accent-link" href="https://www.instagram.com/lianaroozbahani/" target="_blank" rel="noopener">@lianaroozbahani</a>
+          </li>
+          <li>
+            <span class="social-label">GitHub:</span>
+            <a class="accent-link" href="https://github.com/Complieio" target="_blank" rel="noopener">Complieio</a>
+          </li>
+          <li>
+            <span class="social-label">Email:</span>
+            <a class="accent-link" href="mailto:roozbahaniliana@gmail.com">roozbahaniliana@gmail.com</a>
+          </li>
         </ul>
-        <!-- --- END: replaceable content --- -->
+        <!-- ========== end content ========== -->
       </div>
     </div>
   </main>

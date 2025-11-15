@@ -19,8 +19,19 @@
     html,body { height:100%; margin:0; background:var(--bg-color); color:var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
     a { text-decoration: none; }
 
+    /* Canvas background (the orange pixel effect) */
+    canvas#bgCanvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;              /* behind the page content */
+      pointer-events: none;    /* won't block clicks */
+      display:block;
+    }
+
     /* Page layout */
-    .page { min-height:100vh; display:flex; align-items:flex-start; justify-content:center; padding:56px 20px; }
+    .page { min-height:100vh; display:flex; align-items:flex-start; justify-content:center; padding:56px 20px; z-index:1; position:relative; }
     .container {
       width:100%;
       max-width: var(--max-width);
@@ -36,7 +47,7 @@
       width: 200px;
       height: 200px;
       object-fit: cover;
-      border-radius: 12px;                /* slightly rounded corners */
+      border-radius: 12px;
       border: 1px solid rgba(255,255,255,0.06);
       box-shadow: 0 10px 30px rgba(0,0,0,0.6);
       background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
@@ -73,7 +84,6 @@
       color: transparent;
       font-weight: 600;
     }
-    /* For readability when clicked/visited keep subtle contrast */
     a.accent-link:visited { opacity: 0.95; }
 
     /* Lists */
@@ -81,10 +91,8 @@
     ul { margin:6px 0 12px 20px; padding:0; }
     li { margin-bottom:8px; color:var(--muted); }
 
-    /* label before link (bold part like "X: ") */
     .social-label { color: var(--text); font-weight:600; margin-right:6px; }
 
-    /* make non-gradient fallback link color readable on dark bg */
     a { color: #ffaf88; }
 
     /* small screen tweaks */
@@ -95,16 +103,17 @@
   </style>
 </head>
 <body>
+  <!-- Canvas for the orange "pixel" effect -->
+  <canvas id="bgCanvas" aria-hidden="true"></canvas>
+
   <main class="page">
     <div class="container">
 
       <!-- Photo (centered) -->
-      <!-- Replace assets/profile.jpg with your own image (same filename or update path) -->
       <img class="photo" src="assets/profile.jpg" alt="Liana portrait" width="200" height="200" />
 
       <!-- Content area -->
       <div class="content">
-        <!-- ========== Text content (edited as requested) ========== -->
         <p class="intro">
           I'm Liana, a 14 y/o entrepreneur based in Sweden. I like reading, creating stuff online, and finding new things worth getting good at.
         </p>
@@ -146,9 +155,148 @@
             <a class="accent-link" href="mailto:roozbahaniliana@gmail.com">roozbahaniliana@gmail.com</a>
           </li>
         </ul>
-        <!-- ========== end content ========== -->
       </div>
     </div>
   </main>
+
+  <script>
+    /* Minimal, performant grid-of-squares mouse-follow effect.
+       - Canvas is behind content (pointer-events:none)
+       - DevicePixelRatio aware
+       - Smooth mouse movement
+       - Works with mouse + touch
+    */
+    (function () {
+      const canvas = document.getElementById('bgCanvas');
+      const ctx = canvas.getContext('2d', { alpha: true });
+
+      // Grid config (tweak to change look / density)
+      const CELL_SIZE = 10;      // base square size in px
+      const GAP = 6;             // gap between squares
+      const RADIUS = 220;        // influence radius in px
+      const PULSE = 0.8;         // strength of solo pulsing when not hovered
+      const HIGHLIGHT_SCALE = 2.2;// how much a cell can grow when hovered
+
+      let DPR = Math.max(window.devicePixelRatio || 1, 1);
+      let width = 0, height = 0;
+      let cells = []; // {x,y,baseSize,phase}
+
+      // mouse smoothing
+      const mouse = { x: -9999, y: -9999 };
+      const mouseTarget = { x: -9999, y: -9999 };
+      const mouseSmooth = { x: -9999, y: -9999 };
+
+      function resize() {
+        DPR = Math.max(window.devicePixelRatio || 1, 1);
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.style.width = width + 'px';
+        canvas.style.height = height + 'px';
+        canvas.width = Math.round(width * DPR);
+        canvas.height = Math.round(height * DPR);
+        ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        buildGrid();
+      }
+
+      function buildGrid() {
+        cells = [];
+        const step = CELL_SIZE + GAP;
+        const cols = Math.ceil(width / step) + 1;
+        const rows = Math.ceil(height / step) + 1;
+        const offsetX = Math.floor((width - cols * step + step) / 2);
+        const offsetY = Math.floor((height - rows * step + step) / 2);
+
+        for (let row = 0; row < rows; row++) {
+          for (let col = 0; col < cols; col++) {
+            const x = offsetX + col * step + step / 2;
+            const y = offsetY + row * step + step / 2;
+            cells.push({
+              x, y,
+              base: CELL_SIZE,
+              phase: Math.random() * Math.PI * 2  // for subtle pulsing
+            });
+          }
+        }
+      }
+
+      // color interpolation: from deep red -> bright orange
+      function colorFor(t, alpha) {
+        // t in [0,1]
+        const r = Math.round(140 + 115 * t); // 140 -> 255
+        const g = Math.round(20 + 80 * t);   // 20 -> 100
+        const b = Math.round(10 + 20 * t);   // 10 -> 30
+        return `rgba(${r},${g},${b},${alpha})`;
+      }
+
+      function draw(now) {
+        ctx.clearRect(0, 0, width, height);
+        // smooth mouse
+        mouseSmooth.x += (mouseTarget.x - mouseSmooth.x) * 0.18;
+        mouseSmooth.y += (mouseTarget.y - mouseSmooth.y) * 0.18;
+
+        // time used for gentle pulsing
+        const t = now * 0.001;
+
+        for (let i = 0; i < cells.length; i++) {
+          const c = cells[i];
+          const dx = mouseSmooth.x - c.x;
+          const dy = mouseSmooth.y - c.y;
+          const d = Math.sqrt(dx * dx + dy * dy);
+          const influence = Math.max(0, 1 - d / RADIUS); // 0..1
+
+          // base size with subtle pulse
+          const pulse = 1 + Math.sin(c.phase + t * 1.6) * (PULSE * 0.08);
+          // interactive scale based on influence
+          const scale = 1 + influence * (HIGHLIGHT_SCALE - 1);
+          const size = c.base * pulse * scale;
+
+          // color strength and alpha
+          const colStrength = Math.min(1, influence * 1.25);
+          // fallback small visibility for non-influenced squares (keeps texture)
+          const alpha = 0.05 + colStrength * 0.95;
+
+          // Slight rounding and corner to look more like squares in screenshot
+          ctx.beginPath();
+          ctx.fillStyle = colorFor(colStrength, alpha);
+          const half = size / 2;
+          // draw rect centered at (c.x, c.y)
+          ctx.fillRect(Math.round(c.x - half), Math.round(c.y - half), Math.round(size), Math.round(size));
+        }
+
+        requestAnimationFrame(draw);
+      }
+
+      // Events
+      window.addEventListener('mousemove', (e) => {
+        mouseTarget.x = e.clientX;
+        mouseTarget.y = e.clientY;
+      }, { passive: true });
+
+      window.addEventListener('touchstart', (e) => {
+        if (e.touches && e.touches[0]) {
+          mouseTarget.x = e.touches[0].clientX;
+          mouseTarget.y = e.touches[0].clientY;
+        }
+      }, { passive: true });
+
+      window.addEventListener('touchmove', (e) => {
+        if (e.touches && e.touches[0]) {
+          mouseTarget.x = e.touches[0].clientX;
+          mouseTarget.y = e.touches[0].clientY;
+        }
+      }, { passive: true });
+
+      // When mouse leaves, push it far away so effect fades
+      window.addEventListener('mouseleave', () => {
+        mouseTarget.x = -9999;
+        mouseTarget.y = -9999;
+      });
+
+      // Initial setup
+      resize();
+      window.addEventListener('resize', resize, { passive: true });
+      requestAnimationFrame(draw);
+    })();
+  </script>
 </body>
 </html>

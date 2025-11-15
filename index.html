@@ -1,1 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Your Name — profile</title>
 
+  <style>
+    :root{
+      --accent-gradient: linear-gradient(90deg, #FF3D3D 0%, #FF914D 100%);
+      --bg-color: #000;
+      --text: #e6e6e6;
+      --muted: #bdbdbd;
+      --max-width: 820px;
+    }
+
+    /* Reset / base */
+    * { box-sizing: border-box; }
+    html,body { height:100%; margin:0; background:var(--bg-color); color:var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+    a { text-decoration: none; }
+
+    /* Page layout */
+    .page { min-height:100vh; display:flex; align-items:flex-start; justify-content:center; padding:56px 20px; }
+    .container {
+      width:100%;
+      max-width: var(--max-width);
+      margin: 0 auto;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap: 22px;
+    }
+
+    /* Photo: centered medium size with slightly rounded corners */
+    .photo {
+      width: 200px;
+      height: 200px;
+      object-fit: cover;
+      border-radius: 12px;                /* slightly rounded corners */
+      border: 1px solid rgba(255,255,255,0.06);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      display:block;
+    }
+
+    /* Content column */
+    .content {
+      width:100%;
+      padding: 0 12px;
+      color: var(--muted);
+      line-height:1.55;
+      text-align: left;
+    }
+
+    .name {
+      margin: 6px 0 10px 0;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.2px;
+      /* gradient text for the primary accent */
+      background: var(--accent-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .intro {
+      margin: 8px 0 12px 0;
+      color: var(--text);
+      font-size: 15px;
+    }
+
+    .current, .email {
+      margin: 6px 0 12px 0;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    /* Gradient-accent links */
+    .accent-link {
+      background: var(--accent-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+      font-weight: 600;
+    }
+    /* For readability when clicked/visited keep subtle contrast */
+    a.accent-link:visited { opacity: 0.95; }
+
+    /* Lists */
+    .content h3 { margin-top:14px; margin-bottom:8px; color:var(--text); font-size:15px; }
+    ul { margin:6px 0 12px 20px; padding:0; }
+    li { margin-bottom:8px; color:var(--muted); }
+
+    /* make code/links accessible on dark bg when not using gradient */
+    a { color: #ffaf88; }
+
+    /* small screen tweaks */
+    @media (max-width:640px) {
+      .photo { width:160px; height:160px; border-radius:10px; }
+      .name { font-size:20px; }
+      .container { padding: 0 6px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="container">
+
+      <!-- Photo (centered) -->
+      <!-- Replace assets/profile.jpg with your own image (same filename or update path) -->
+      <img class="photo" src="assets/profile.jpg" alt="Your Name portrait" width="200" height="200" />
+
+      <!-- Content area -->
+      <div class="content">
+        <!-- EDIT: replace the text below with your own -->
+        <h1 class="name">I'm <span id="your-name">Your Name</span></h1>
+
+        <p class="intro">
+          I'm <strong>Your short tagline</strong>. I build things, experiment with ML, and explore rabbit holes.
+        </p>
+
+        <p class="current">
+          I'm currently building <a class="accent-link" href="https://example.com" target="_blank" rel="noopener">Something</a>.
+        </p>
+
+        <p class="email">Email: <a class="accent-link" href="mailto:you@example.com">you@example.com</a></p>
+
+        <h3>Cool stuff I have done in the past:</h3>
+        <ul>
+          <li><a class="accent-link" href="https://example.com/link1" target="_blank" rel="noopener">Project / Thing 1</a></li>
+          <li><a class="accent-link" href="https://example.com/link2" target="_blank" rel="noopener">Project / Thing 2</a></li>
+          <li><a class="accent-link" href="https://example.com/link3" target="_blank" rel="noopener">Project / Thing 3</a></li>
+        </ul>
+
+        <h3>Purpose:</h3>
+        <ul>
+          <li>Scale consciousness vertically</li>
+        </ul>
+
+        <h3>Thoughts:</h3>
+        <ul>
+          <li>Analysis paralysis is a skill issue</li>
+          <li>We are starting to see the beginning of recursive self-improvement</li>
+          <li>AGI is no longer a research problem, it's an engineering problem</li>
+        </ul>
+        <!-- END EDIT -->
+      </div>
+    </div>
+  </main>
+</body>
+</html>

@@ -53,7 +53,6 @@
       transform: none;
     }
 
-    /* Photo: centered medium size with slightly rounded corners */
     .photo {
       width: 200px;
       height: 200px;
@@ -74,7 +73,6 @@
       transform: scale(1) rotate(0deg);
     }
 
-    /* Content column */
     .content {
       width:100%;
       padding: 0 12px;
@@ -104,7 +102,6 @@
       font-size: 15px;
     }
 
-    /* Gradient-accent links */
     .accent-link {
       background: var(--accent-gradient);
       -webkit-background-clip: text;
@@ -115,7 +112,6 @@
     }
     a.accent-link:visited { opacity: 0.95; }
 
-    /* Lists */
     .content h3 { margin-top:14px; margin-bottom:8px; color:var(--text); font-size:15px; }
     ul { margin:6px 0 12px 20px; padding:0; }
     li { margin-bottom:8px; color:var(--muted); }
@@ -124,38 +120,28 @@
 
     a { color: #ffaf88; }
 
-    /* small screen tweaks */
     @media (max-width:640px) {
       .photo { width:160px; height:160px; border-radius:10px; }
       .container { padding: 0 6px; }
     }
 
-    /* Respect reduced motion */
     @media (prefers-reduced-motion: reduce) {
       canvas#bgCanvas { display: none; }
       .container, .photo, .content { transition: none; transform: none; opacity: 1 !important; }
     }
 
-    /* hidden mask image (for authoring only) */
     img#scribbleMask { display:none; }
   </style>
 </head>
 <body>
-  <!-- Canvas for the small-square trail effect -->
   <canvas id="bgCanvas" aria-hidden="true"></canvas>
 
-  <!-- Hidden mask image: place your drawn-scribbles image here -->
-  <!-- IMPORTANT: put an image where scribbles are bright/white and rest dark/transparent.
-       Save it as assets/scribble-mask.png (or change the path below to your file) -->
+  <!-- mask we generated for you — make sure this file exists at this path -->
   <img id="scribbleMask" src="assets/scribble-mask.png" alt="scribble mask" crossorigin="anonymous" />
 
   <main class="page">
     <div class="container" id="pageContainer">
-
-      <!-- Photo (centered) -->
       <img class="photo" id="profilePhoto" src="assets/profile.jpg" alt="Liana portrait" width="200" height="200" />
-
-      <!-- Content area -->
       <div class="content" id="textContent">
         <p class="intro">
           I'm Liana, a 14 y/o entrepreneur based in Sweden. I like reading, creating stuff online, and finding new things worth getting good at.
@@ -208,23 +194,21 @@
       const ctx = canvas.getContext('2d', { alpha: true });
 
       // ---------- Tweak these to change the effect ----------
-      const SPAWN_COUNT = 3;        // how many squares to spawn per mousemove event (1-6) - unchanged
-      const PARTICLE_MIN_SIZE = 6;  // px (small squares)
-      const PARTICLE_MAX_SIZE = 12; // px
-      const LIFESPAN_MIN = 300;     // ms
-      const LIFESPAN_MAX = 700;     // ms
-      const MAX_PARTICLES = 800;    // cap for performance
-      const FRICTION = 0.86;        // how quickly particles slow
-      // ambient sampling step (larger = fewer sample points / faster)
+      const SPAWN_COUNT = 3;
+      const PARTICLE_MIN_SIZE = 6;
+      const PARTICLE_MAX_SIZE = 12;
+      const LIFESPAN_MIN = 300;
+      const LIFESPAN_MAX = 700;
+      const MAX_PARTICLES = 800;
+      const FRICTION = 0.86;
       const MASK_SAMPLE_STEP = 8;
-      // minimum brightness threshold (0-255*3) to consider a pixel "white" in the mask
       const MASK_THRESHOLD = 600;
       // -----------------------------------------------------
 
       let DPR = Math.max(window.devicePixelRatio || 1, 1);
       let width = 0, height = 0;
       let particles = [];
-      let maskPoints = []; // allowed ambient spawn coords (in CSS pixels)
+      let maskPoints = [];
       let maskReady = false;
       const maskImg = document.getElementById('scribbleMask');
 
@@ -237,19 +221,15 @@
         canvas.width = Math.round(width * DPR);
         canvas.height = Math.round(height * DPR);
         ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-
-        // if mask is loaded, rebuild sampling map to match new size
         if (maskImg && maskImg.complete) buildMaskPoints();
       }
 
-      // create a single particle
       function spawnParticle(x, y, vx = 0, vy = 0) {
         if (particles.length >= MAX_PARTICLES) return;
         const size = randRange(PARTICLE_MIN_SIZE, PARTICLE_MAX_SIZE);
         const life = randRange(LIFESPAN_MIN, LIFESPAN_MAX);
-        // color blend between two oranges for slight variety
-        const colorA = [255, 61, 61];   // #FF3D3D
-        const colorB = [255, 145, 77];  // #FF914D
+        const colorA = [255, 61, 61];
+        const colorB = [255, 145, 77];
         const mix = Math.random();
         const r = Math.round(lerp(colorA[0], colorB[0], mix));
         const g = Math.round(lerp(colorA[1], colorB[1], mix));
@@ -265,9 +245,7 @@
         });
       }
 
-      // EXACT original velocity math preserved here
       function handleMove(clientX, clientY, movementX, movementY) {
-        // spawn a few squares at and near the pointer (unchanged)
         for (let i = 0; i < SPAWN_COUNT; i++) {
           const ox = randRange(-4, 4);
           const oy = randRange(-4, 4);
@@ -277,7 +255,6 @@
         }
       }
 
-      // spawn a radial burst from a center point (used on load)
       function spawnBurst(cx, cy, count = 40, speed = 3.5) {
         for (let i = 0; i < count; i++) {
           const angle = Math.random() * Math.PI * 2;
@@ -290,20 +267,14 @@
         }
       }
 
-      // Build list of allowed ambient spawn points from the mask image.
-      // This draws the mask to an offscreen canvas sized to viewport and samples pixels.
       function buildMaskPoints() {
         try {
           const off = document.createElement('canvas');
           off.width = width;
           off.height = height;
           const octx = off.getContext('2d');
-
-          // draw the mask stretched to viewport; this keeps coordinates aligned
           octx.clearRect(0, 0, off.width, off.height);
-          // draw the mask filling the canvas
           octx.drawImage(maskImg, 0, 0, off.width, off.height);
-
           const id = octx.getImageData(0, 0, off.width, off.height);
           const data = id.data;
           maskPoints = [];
@@ -312,47 +283,27 @@
               const idx = (y * off.width + x) * 4;
               const r = data[idx], g = data[idx + 1], b = data[idx + 2], a = data[idx + 3];
               const bright = r + g + b;
-              // require the pixel to be bright enough and not transparent
               if (a > 80 && bright >= MASK_THRESHOLD) {
                 maskPoints.push({ x: x + randRange(-MASK_SAMPLE_STEP/2, MASK_SAMPLE_STEP/2), y: y + randRange(-MASK_SAMPLE_STEP/2, MASK_SAMPLE_STEP/2) });
               }
             }
           }
           maskReady = maskPoints.length > 0;
-          // if you want fewer/more spots, you can tweak MASK_SAMPLE_STEP or MASK_THRESHOLD above
-          // console.log('maskPoints', maskPoints.length);
         } catch (err) {
-          // something went wrong reading mask; fallback
           maskPoints = [];
           maskReady = false;
         }
       }
 
-      // ambient spawn: picks either a masked point OR fallback to center-ish if mask missing
+      // NEW: if mask isn't ready, DO NOT spawn ambient particles anywhere
       function maybeAmbient(now) {
-        if (!maskReady) {
-          // fallback: original ambient timing & behavior
-          if (now - ambientTimer > randRange(1600, 3000)) {
-            ambientTimer = now;
-            const cx = randRange(width * 0.25, width * 0.75);
-            const cy = randRange(height * 0.2, height * 0.8);
-            const n = Math.round(randRange(1, 4));
-            for (let i = 0; i < n; i++) {
-              spawnParticle(cx + randRange(-20,20), cy + randRange(-20,20), randRange(-0.4,0.4), randRange(-0.4,0.4));
-            }
-          }
-          return;
-        }
-
-        // when mask is ready, spawn only from maskPoints
+        if (!maskReady) return;
         if (now - ambientTimer > randRange(1600, 3000)) {
           ambientTimer = now;
-          // pick a random allowed mask point and spawn a few near it
           const idx = Math.floor(Math.random() * maskPoints.length);
           const base = maskPoints[idx];
           const n = Math.round(randRange(1, 4));
           for (let i = 0; i < n; i++) {
-            // small jitter around the mask coordinate
             const jitterX = randRange(-18, 18);
             const jitterY = randRange(-18, 18);
             spawnParticle(base.x + jitterX, base.y + jitterY, randRange(-0.4,0.4), randRange(-0.4,0.4));
@@ -360,18 +311,13 @@
         }
       }
 
-      // animation frame
       let last = performance.now();
       let ambientTimer = 0;
       function loop(now) {
         const dt = now - last;
         last = now;
         ctx.clearRect(0, 0, width, height);
-
-        // ambient spawns only from mask (or fallback points)
         maybeAmbient(now);
-
-        // update & draw particles
         for (let i = particles.length - 1; i >= 0; i--) {
           const p = particles[i];
           p.age += dt;
@@ -379,27 +325,20 @@
             particles.splice(i, 1);
             continue;
           }
-          // update physics
           p.vx *= FRICTION;
           p.vy *= FRICTION;
-          p.x += p.vx * (dt / 16.67); // normalize per-frame (60fps base)
+          p.x += p.vx * (dt / 16.67);
           p.y += p.vy * (dt / 16.67);
-
-          // visual alpha: fade out over lifetime
           const alpha = 1 - (p.age / p.life);
-
-          // draw square with crisp edges (use integer coords)
           ctx.globalAlpha = alpha;
           ctx.fillStyle = `rgb(${p.rgb[0]},${p.rgb[1]},${p.rgb[2]})`;
           const s = Math.round(p.size);
           ctx.fillRect(Math.round(p.x - s / 2), Math.round(p.y - s / 2), s, s);
         }
-
         ctx.globalAlpha = 1;
         requestAnimationFrame(loop);
       }
 
-      // pointer events (unchanged)
       let lastEvent = null;
       window.addEventListener('mousemove', (e) => {
         const mx = e.clientX;
@@ -435,25 +374,20 @@
         lastEvent = null;
       });
 
-      // small helpers
       function randRange(a, b) { return a + Math.random() * (b - a); }
       function lerp(a, b, t) { return a + (b - a) * t; }
 
-      // Build mask points when image loads
       maskImg.addEventListener('load', () => {
         try { buildMaskPoints(); } catch (e) { maskReady = false; }
       });
-      // if mask already loaded from cache
       if (maskImg.complete) {
         try { buildMaskPoints(); } catch (e) { maskReady = false; }
       }
 
-      // initialize & entrance animations (kept)
       function initEntrance() {
         const container = document.getElementById('pageContainer');
         const photo = document.getElementById('profilePhoto');
         const text = document.getElementById('textContent');
-
         requestAnimationFrame(() => {
           setTimeout(() => {
             container.classList.add('show');
@@ -463,19 +397,14 @@
         });
       }
 
-      // decide whether to run motion effects
       const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-      // initialize everything
       resize();
       window.addEventListener('resize', resize, { passive: true });
 
       if (!reduceMotion) {
-        // burst from center on load & a gentle secondary burst near the photo
         const cx = Math.round(width / 2);
         const cy = Math.round(height / 3.5);
         spawnBurst(cx, cy, 46, 4.6);
-
         const photoEl = document.getElementById('profilePhoto');
         let rect = photoEl && photoEl.getBoundingClientRect ? photoEl.getBoundingClientRect() : null;
         if (rect) {
@@ -483,16 +412,11 @@
         } else {
           spawnBurst(width * 0.55, height * 0.45, 18, 2.6);
         }
-
         requestAnimationFrame(loop);
       } else {
-        // keep things stable for reduced-motion users
         (function noMotionLoop(){ requestAnimationFrame(noMotionLoop); })();
       }
-
-      // show content (CSS transitions)
       initEntrance();
-
     })();
   </script>
 </body>

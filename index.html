@@ -218,11 +218,11 @@
       const ctx = canvas.getContext('2d', { alpha: true });
 
       // ---------- Tweak these to change the effect ----------
-      const SPAWN_COUNT = 3;        // how many squares to spawn per mousemove event (1-6)
+      const SPAWN_COUNT = 3;        // how many squares to spawn per mousemove event (1-6) — fixed per event
       const PARTICLE_MIN_SIZE = 6;  // px (small squares)
       const PARTICLE_MAX_SIZE = 12; // px
       const LIFESPAN_MIN = 300;     // ms
-      const LIFESPAN_MAX = 900;     // ms
+      const LIFESPAN_MAX = 700;     // ms <-- matches your original
       const MAX_PARTICLES = 800;    // cap for performance
       const FRICTION = 0.86;        // how quickly particles slow
       // -----------------------------------------------------
@@ -230,7 +230,6 @@
       let DPR = Math.max(window.devicePixelRatio || 1, 1);
       let width = 0, height = 0;
       let particles = [];
-      let lastMouse = { x: -9999, y: -9999, t: performance.now() };
 
       function resize() {
         DPR = Math.max(window.devicePixelRatio || 1, 1);
@@ -240,7 +239,6 @@
         canvas.style.height = height + 'px';
         canvas.width = Math.round(width * DPR);
         canvas.height = Math.round(height * DPR);
-        // scale drawing so coordinates can be in CSS pixels
         ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
       }
 
@@ -267,13 +265,12 @@
         });
       }
 
-      // spawn several based on movement speed and SPAWN_COUNT
+      // RESTORED: spawn several based on fixed SPAWN_COUNT (like your original)
       function handleMove(clientX, clientY, movementX, movementY) {
-        const speed = Math.sqrt(movementX * movementX + movementY * movementY);
-        const count = Math.min(6, Math.max(1, Math.round(SPAWN_COUNT + speed * 0.02)));
-        for (let i = 0; i < count; i++) {
+        for (let i = 0; i < SPAWN_COUNT; i++) {
           const ox = randRange(-4, 4);
           const oy = randRange(-4, 4);
+          // velocity influenced by mouse movement for trailing
           const vx = movementX * 0.15 + randRange(-0.6, 0.6);
           const vy = movementY * 0.15 + randRange(-0.6, 0.6);
           spawnParticle(clientX + ox, clientY + oy, vx, vy);
@@ -296,10 +293,8 @@
       // small ambient periodic spawns (very subtle)
       let ambientTimer = 0;
       function maybeAmbient(now) {
-        // every ~1.6 - 3s create a tiny drift somewhere near the center or edges
         if (now - ambientTimer > randRange(1600, 3000)) {
           ambientTimer = now;
-          // choose a random sector near center-ish
           const cx = randRange(width * 0.25, width * 0.75);
           const cy = randRange(height * 0.2, height * 0.8);
           const n = Math.round(randRange(1, 4));
@@ -316,10 +311,8 @@
         last = now;
         ctx.clearRect(0, 0, width, height);
 
-        // ambient spawns
         maybeAmbient(now);
 
-        // update & draw particles
         for (let i = particles.length - 1; i >= 0; i--) {
           const p = particles[i];
           p.age += dt;
@@ -327,13 +320,17 @@
             particles.splice(i, 1);
             continue;
           }
+          // update physics
           p.vx *= FRICTION;
           p.vy *= FRICTION;
           p.x += p.vx * (dt / 16.67);
           p.y += p.vy * (dt / 16.67);
 
+          // visual alpha: fade out over lifetime
           const alpha = 1 - (p.age / p.life);
-          ctx.globalAlpha = alpha;
+
+          // draw square with crisp edges (use integer coords)
+          ctx.globalAlpha = Math.min(1, alpha * 1.05);
           ctx.fillStyle = `rgb(${p.rgb[0]},${p.rgb[1]},${p.rgb[2]})`;
           const s = Math.round(p.size);
           ctx.fillRect(Math.round(p.x - s / 2), Math.round(p.y - s / 2), s, s);
@@ -389,9 +386,7 @@
         const photo = document.getElementById('profilePhoto');
         const text = document.getElementById('textContent');
 
-        // Wait a tick so CSS transitions run — apply show classes in staged manner
         requestAnimationFrame(() => {
-          // small delay so burst can happen slightly before content appears
           setTimeout(() => {
             container.classList.add('show');
             setTimeout(() => photo.classList.add('show'), 90);
@@ -411,23 +406,19 @@
         // burst from center on load & a gentle secondary burst near the photo
         const cx = Math.round(width / 2);
         const cy = Math.round(height / 3.5);
-        // small first-pop for "arriving" feeling
         spawnBurst(cx, cy, 46, 4.6);
-        // second, subtle burst where the profile photo is (if available)
-        // attempt to compute photo center; fallback to center-bottom area
-        const photo = document.getElementById('profilePhoto');
-        let rect = photo && photo.getBoundingClientRect ? photo.getBoundingClientRect() : null;
+
+        const photoEl = document.getElementById('profilePhoto');
+        let rect = photoEl && photoEl.getBoundingClientRect ? photoEl.getBoundingClientRect() : null;
         if (rect) {
           spawnBurst(rect.left + rect.width / 2, rect.top + rect.height / 2, 18, 2.6);
         } else {
           spawnBurst(width * 0.55, height * 0.45, 18, 2.6);
         }
 
-        // start animation loop
         requestAnimationFrame(loop);
       } else {
-        // if reduced motion, don't run the particle loop and just show content
-        // but still start an empty loop to keep code stable (no drawing)
+        // keep things stable for reduced-motion users
         (function noMotionLoop(){ requestAnimationFrame(noMotionLoop); })();
       }
 

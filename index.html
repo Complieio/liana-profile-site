@@ -145,8 +145,6 @@
   <canvas id="bgCanvas" aria-hidden="true"></canvas>
 
   <!-- Hidden mask image: place your drawn-scribbles image here -->
-  <!-- IMPORTANT: put an image where scribbles are bright/white and rest dark/transparent.
-       Save it as assets/scribble-mask.png (or change the path below to your file) -->
   <img id="scribbleMask" src="assets/scribble-mask.png" alt="scribble mask" crossorigin="anonymous" />
 
   <main class="page">
@@ -208,23 +206,41 @@
       const ctx = canvas.getContext('2d', { alpha: true });
 
       // ---------- Tweak these to change the effect ----------
-      const SPAWN_COUNT = 3;        // how many squares to spawn per mousemove event (1-6) - unchanged
+      // Mouse-driven particle settings (left untouched from your original)
+      const SPAWN_COUNT = 3;        // how many squares to spawn per mousemove event (1-6)
       const PARTICLE_MIN_SIZE = 6;  // px (small squares)
       const PARTICLE_MAX_SIZE = 12; // px
       const LIFESPAN_MIN = 300;     // ms
       const LIFESPAN_MAX = 700;     // ms
-      const MAX_PARTICLES = 800;    // cap for performance
+      const MAX_PARTICLES = 1200;   // increased cap to allow corner emitters too
       const FRICTION = 0.86;        // how quickly particles slow
-      // ambient sampling step (larger = fewer sample points / faster)
+      // Ambient / mask sampling
       const MASK_SAMPLE_STEP = 8;
-      // minimum brightness threshold (0-255*3) to consider a pixel "white" in the mask
       const MASK_THRESHOLD = 600;
+      // Corner emitter specifics (separate from mouse particles)
+      const CORNER = {
+        // number of squares per spawn in corners (1-6)
+        minSpawn: 1,
+        maxSpawn: 3,
+        sizeMin: 4,
+        sizeMax: 10,
+        lifeMin: 800,
+        lifeMax: 1600,
+        // base speed multiplier for corner particles
+        speedMin: 0.8,
+        speedMax: 2.4,
+        // how often a corner tries to emit (ms)
+        intervalMin: 700,
+        intervalMax: 1700,
+        // subtle directional spread inward (degrees)
+        spreadDeg: 28
+      };
       // -----------------------------------------------------
 
       let DPR = Math.max(window.devicePixelRatio || 1, 1);
       let width = 0, height = 0;
       let particles = [];
-      let maskPoints = []; // allowed ambient spawn coords (in CSS pixels)
+      let maskPoints = []; // allowed ambient spawn coords
       let maskReady = false;
       const maskImg = document.getElementById('scribbleMask');
 
@@ -238,26 +254,25 @@
         canvas.height = Math.round(height * DPR);
         ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
-        // if mask is loaded, rebuild sampling map to match new size
         if (maskImg && maskImg.complete) buildMaskPoints();
       }
 
-      // create a single particle
-      function spawnParticle(x, y, vx = 0, vy = 0) {
+      // create a single particle (used by both mouse and corner spawners)
+      function spawnParticle(x, y, vx = 0, vy = 0, opts = {}) {
         if (particles.length >= MAX_PARTICLES) return;
-        const size = randRange(PARTICLE_MIN_SIZE, PARTICLE_MAX_SIZE);
-        const life = randRange(LIFESPAN_MIN, LIFESPAN_MAX);
+        const size = opts.size ?? randRange(PARTICLE_MIN_SIZE, PARTICLE_MAX_SIZE);
+        const life = opts.life ?? randRange(LIFESPAN_MIN, LIFESPAN_MAX);
         // color blend between two oranges for slight variety
-        const colorA = [255, 61, 61];   // #FF3D3D
-        const colorB = [255, 145, 77];  // #FF914D
+        const colorA = opts.colorA ?? [255, 61, 61];   // #FF3D3D
+        const colorB = opts.colorB ?? [255, 145, 77];  // #FF914D
         const mix = Math.random();
         const r = Math.round(lerp(colorA[0], colorB[0], mix));
         const g = Math.round(lerp(colorA[1], colorB[1], mix));
         const b = Math.round(lerp(colorA[2], colorB[2], mix));
         particles.push({
           x, y,
-          vx: vx + randRange(-0.5, 0.5),
-          vy: vy + randRange(-0.5, 0.5),
+          vx: vx + randRange(-0.45, 0.45),
+          vy: vy + randRange(-0.45, 0.45),
           size,
           life,
           age: 0,
@@ -265,9 +280,8 @@
         });
       }
 
-      // EXACT original velocity math preserved here
+      // EXACT original velocity math preserved here (mouse)
       function handleMove(clientX, clientY, movementX, movementY) {
-        // spawn a few squares at and near the pointer (unchanged)
         for (let i = 0; i < SPAWN_COUNT; i++) {
           const ox = randRange(-4, 4);
           const oy = randRange(-4, 4);
@@ -290,18 +304,14 @@
         }
       }
 
-      // Build list of allowed ambient spawn points from the mask image.
-      // This draws the mask to an offscreen canvas sized to viewport and samples pixels.
+      // Build mask points from the scribble image
       function buildMaskPoints() {
         try {
           const off = document.createElement('canvas');
           off.width = width;
           off.height = height;
           const octx = off.getContext('2d');
-
-          // draw the mask stretched to viewport; this keeps coordinates aligned
           octx.clearRect(0, 0, off.width, off.height);
-          // draw the mask filling the canvas
           octx.drawImage(maskImg, 0, 0, off.width, off.height);
 
           const id = octx.getImageData(0, 0, off.width, off.height);
@@ -312,26 +322,22 @@
               const idx = (y * off.width + x) * 4;
               const r = data[idx], g = data[idx + 1], b = data[idx + 2], a = data[idx + 3];
               const bright = r + g + b;
-              // require the pixel to be bright enough and not transparent
               if (a > 80 && bright >= MASK_THRESHOLD) {
                 maskPoints.push({ x: x + randRange(-MASK_SAMPLE_STEP/2, MASK_SAMPLE_STEP/2), y: y + randRange(-MASK_SAMPLE_STEP/2, MASK_SAMPLE_STEP/2) });
               }
             }
           }
           maskReady = maskPoints.length > 0;
-          // if you want fewer/more spots, you can tweak MASK_SAMPLE_STEP or MASK_THRESHOLD above
-          // console.log('maskPoints', maskPoints.length);
         } catch (err) {
-          // something went wrong reading mask; fallback
           maskPoints = [];
           maskReady = false;
         }
       }
 
-      // ambient spawn: picks either a masked point OR fallback to center-ish if mask missing
+      // Ambient spawn (uses mask if available) - unchanged behavior
+      let ambientTimer = 0;
       function maybeAmbient(now) {
         if (!maskReady) {
-          // fallback: original ambient timing & behavior
           if (now - ambientTimer > randRange(1600, 3000)) {
             ambientTimer = now;
             const cx = randRange(width * 0.25, width * 0.75);
@@ -343,16 +349,12 @@
           }
           return;
         }
-
-        // when mask is ready, spawn only from maskPoints
         if (now - ambientTimer > randRange(1600, 3000)) {
           ambientTimer = now;
-          // pick a random allowed mask point and spawn a few near it
           const idx = Math.floor(Math.random() * maskPoints.length);
           const base = maskPoints[idx];
           const n = Math.round(randRange(1, 4));
           for (let i = 0; i < n; i++) {
-            // small jitter around the mask coordinate
             const jitterX = randRange(-18, 18);
             const jitterY = randRange(-18, 18);
             spawnParticle(base.x + jitterX, base.y + jitterY, randRange(-0.4,0.4), randRange(-0.4,0.4));
@@ -360,18 +362,78 @@
         }
       }
 
+      // ---------- Corner emitters (new) ----------
+      // corners: TL, TR, BL, BR
+      const corners = [
+        { name: 'top-left',   x: () => 0,    y: () => 0,    dirX: 1, dirY: 1 },
+        { name: 'top-right',  x: () => width, y: () => 0,    dirX: -1, dirY: 1 },
+        { name: 'bottom-left',x: () => 0,    y: () => height,dirX: 1, dirY: -1 },
+        { name: 'bottom-right',x: () => width,y: () => height,dirX: -1, dirY: -1 }
+      ];
+
+      // corner emit timers/next intervals
+      const cornerState = corners.map(() => ({ next: 0 }));
+
+      // spawn corner particles: subtle inward drift with spread
+      function cornerTick(now) {
+        // don't run if reduced motion requested
+        const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduceMotion) return;
+
+        for (let i = 0; i < corners.length; i++) {
+          const c = corners[i];
+          const state = cornerState[i];
+          if (now >= state.next) {
+            // set next time
+            state.next = now + randRange(CORNER.intervalMin, CORNER.intervalMax);
+
+            // how many to spawn this time
+            const count = Math.round(randRange(CORNER.minSpawn, CORNER.maxSpawn));
+            for (let k = 0; k < count; k++) {
+              // start slightly inset so squares look like they emanate from corner edge
+              const inset = randRange(2, 22);
+              const cx = clamp(c.x() + (c.dirX === -1 ? -inset : inset), -8, width + 8);
+              const cy = clamp(c.y() + (c.dirY === -1 ? -inset : inset), -8, height + 8);
+
+              // direction toward center-ish with random spread
+              const centerAngle = Math.atan2(height * 0.45 - cy, width * 0.5 - cx); // a gentle bias toward center-left/top etc
+              // convert centerAngle to degrees then add small spread bias outward/inward
+              const deg = centerAngle * 180 / Math.PI;
+              const spread = randRange(-CORNER.spreadDeg, CORNER.spreadDeg);
+              const finalAngle = (deg + spread) * Math.PI / 180;
+              const speed = randRange(CORNER.speedMin, CORNER.speedMax);
+              const vx = Math.cos(finalAngle) * speed;
+              const vy = Math.sin(finalAngle) * speed;
+
+              // choose slightly warmer/redder colors for corner emitters to give them character
+              const cornerColorA = [255, 58, 50]; // a slightly redder tone
+              const cornerColorB = [255, 130, 60];
+
+              // size & life for corner particles (separate)
+              const size = randRange(CORNER.sizeMin, CORNER.sizeMax);
+              const life = randRange(CORNER.lifeMin, CORNER.lifeMax);
+
+              spawnParticle(cx, cy, vx, vy, { size, life, colorA: cornerColorA, colorB: cornerColorB });
+            }
+          }
+        }
+      }
+      // ---------- end corner emitters ----------
+
       // animation frame
       let last = performance.now();
-      let ambientTimer = 0;
       function loop(now) {
         const dt = now - last;
         last = now;
         ctx.clearRect(0, 0, width, height);
 
-        // ambient spawns only from mask (or fallback points)
+        // ambient spawns (mask-driven) - unchanged
         maybeAmbient(now);
 
-        // update & draw particles
+        // corner emitters
+        cornerTick(now);
+
+        // update & draw particles (shared for mouse & corners)
         for (let i = particles.length - 1; i >= 0; i--) {
           const p = particles[i];
           p.age += dt;
@@ -385,8 +447,8 @@
           p.x += p.vx * (dt / 16.67); // normalize per-frame (60fps base)
           p.y += p.vy * (dt / 16.67);
 
-          // visual alpha: fade out over lifetime
-          const alpha = 1 - (p.age / p.life);
+          // visual alpha: fade out over lifetime, plus a tiny global dim so corners feel atmospheric
+          const alpha = (1 - (p.age / p.life)) * 1.0;
 
           // draw square with crisp edges (use integer coords)
           ctx.globalAlpha = alpha;
@@ -438,12 +500,12 @@
       // small helpers
       function randRange(a, b) { return a + Math.random() * (b - a); }
       function lerp(a, b, t) { return a + (b - a) * t; }
+      function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 
       // Build mask points when image loads
       maskImg.addEventListener('load', () => {
         try { buildMaskPoints(); } catch (e) { maskReady = false; }
       });
-      // if mask already loaded from cache
       if (maskImg.complete) {
         try { buildMaskPoints(); } catch (e) { maskReady = false; }
       }
@@ -471,7 +533,7 @@
       window.addEventListener('resize', resize, { passive: true });
 
       if (!reduceMotion) {
-        // burst from center on load & a gentle secondary burst near the photo
+        // tasteful bursts on load (kept)
         const cx = Math.round(width / 2);
         const cy = Math.round(height / 3.5);
         spawnBurst(cx, cy, 46, 4.6);
@@ -486,7 +548,6 @@
 
         requestAnimationFrame(loop);
       } else {
-        // keep things stable for reduced-motion users
         (function noMotionLoop(){ requestAnimationFrame(noMotionLoop); })();
       }
 

@@ -28,7 +28,20 @@
       z-index: 0;              /* behind the page content */
       pointer-events: none;    /* won't block clicks */
       display:block;
-      background: transparent;
+      background: radial-gradient(1200px 600px at 10% 10%, rgba(255,61,61,0.03), transparent 8%),
+                  radial-gradient(900px 400px at 90% 90%, rgba(255,145,77,0.02), transparent 10%);
+    }
+
+    /* subtle vignette */
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      background: radial-gradient(60% 60% at 50% 40%, rgba(255,255,255,0.02), transparent 30%),
+                  radial-gradient(100% 100% at 50% 80%, rgba(0,0,0,0.45), rgba(0,0,0,0.6));
+      mix-blend-mode: multiply;
     }
 
     /* Page layout */
@@ -41,6 +54,16 @@
       flex-direction:column;
       align-items:center;
       gap: 22px;
+      transform-origin: center;
+      opacity: 0;
+      transform: translateY(12px) scale(0.995);
+      transition: opacity 520ms cubic-bezier(.2,.9,.2,1), transform 520ms cubic-bezier(.2,.9,.2,1);
+      will-change: opacity, transform;
+    }
+
+    .container.show {
+      opacity: 1;
+      transform: none;
     }
 
     /* Photo: centered medium size with slightly rounded corners */
@@ -50,9 +73,18 @@
       object-fit: cover;
       border-radius: 12px;
       border: 1px solid rgba(255,255,255,0.06);
-      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.6);
       background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
       display:block;
+      transform-origin: center;
+      transform: scale(0.9) rotate(-1.2deg);
+      opacity: 0;
+      transition: transform 680ms cubic-bezier(.2,.9,.25,1), opacity 680ms cubic-bezier(.2,.9,.25,1);
+    }
+
+    .photo.show {
+      opacity: 1;
+      transform: scale(1) rotate(0deg);
     }
 
     /* Content column */
@@ -62,6 +94,15 @@
       color: var(--muted);
       line-height:1.55;
       text-align: left;
+      transform-origin: left top;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 680ms cubic-bezier(.2,.9,.25,1) 140ms, transform 680ms cubic-bezier(.2,.9,.25,1) 140ms;
+    }
+
+    .content.show {
+      opacity: 1;
+      transform: none;
     }
 
     .intro {
@@ -76,7 +117,7 @@
       font-size: 15px;
     }
 
-    /* Gradient-accent links */
+    /* Gradient-accent links with subtle shimmer */
     .accent-link {
       background: var(--accent-gradient);
       -webkit-background-clip: text;
@@ -84,7 +125,11 @@
       background-clip: text;
       color: transparent;
       font-weight: 600;
+      background-size: 200% 100%;
+      background-position: 0% 50%;
+      transition: background-position 900ms linear;
     }
+    .accent-link:hover { background-position: 100% 50%; }
     a.accent-link:visited { opacity: 0.95; }
 
     /* Lists */
@@ -101,6 +146,13 @@
       .photo { width:160px; height:160px; border-radius:10px; }
       .container { padding: 0 6px; }
     }
+
+    /* Respect reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      canvas#bgCanvas { display: none; }
+      .container, .photo, .content { transition: none; transform: none; opacity: 1 !important; }
+      body::after { display:none; }
+    }
   </style>
 </head>
 <body>
@@ -108,13 +160,13 @@
   <canvas id="bgCanvas" aria-hidden="true"></canvas>
 
   <main class="page">
-    <div class="container">
+    <div class="container" id="pageContainer">
 
       <!-- Photo (centered) -->
-      <img class="photo" src="assets/profile.jpg" alt="Liana portrait" width="200" height="200" />
+      <img class="photo" id="profilePhoto" src="assets/profile.jpg" alt="Liana portrait" width="200" height="200" />
 
       <!-- Content area -->
-      <div class="content">
+      <div class="content" id="textContent">
         <p class="intro">
           I'm Liana, a 14 y/o entrepreneur based in Sweden. I like reading, creating stuff online, and finding new things worth getting good at.
         </p>
@@ -170,7 +222,7 @@
       const PARTICLE_MIN_SIZE = 6;  // px (small squares)
       const PARTICLE_MAX_SIZE = 12; // px
       const LIFESPAN_MIN = 300;     // ms
-      const LIFESPAN_MAX = 700;     // ms
+      const LIFESPAN_MAX = 900;     // ms
       const MAX_PARTICLES = 800;    // cap for performance
       const FRICTION = 0.86;        // how quickly particles slow
       // -----------------------------------------------------
@@ -188,6 +240,7 @@
         canvas.style.height = height + 'px';
         canvas.width = Math.round(width * DPR);
         canvas.height = Math.round(height * DPR);
+        // scale drawing so coordinates can be in CSS pixels
         ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
       }
 
@@ -216,16 +269,43 @@
 
       // spawn several based on movement speed and SPAWN_COUNT
       function handleMove(clientX, clientY, movementX, movementY) {
-        // spawn a few squares at and near the pointer
         const speed = Math.sqrt(movementX * movementX + movementY * movementY);
-        for (let i = 0; i < SPAWN_COUNT; i++) {
-          // slight random offset so squares don't overlap exactly
+        const count = Math.min(6, Math.max(1, Math.round(SPAWN_COUNT + speed * 0.02)));
+        for (let i = 0; i < count; i++) {
           const ox = randRange(-4, 4);
           const oy = randRange(-4, 4);
-          // velocity influenced by mouse movement for trailing
           const vx = movementX * 0.15 + randRange(-0.6, 0.6);
           const vy = movementY * 0.15 + randRange(-0.6, 0.6);
           spawnParticle(clientX + ox, clientY + oy, vx, vy);
+        }
+      }
+
+      // spawn a radial burst from a center point (used on load)
+      function spawnBurst(cx, cy, count = 40, speed = 3.5) {
+        for (let i = 0; i < count; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const spd = randRange(speed * 0.4, speed * 1.1);
+          const vx = Math.cos(angle) * spd + randRange(-0.6, 0.6);
+          const vy = Math.sin(angle) * spd + randRange(-0.6, 0.6);
+          const ox = Math.cos(angle) * randRange(0, 6);
+          const oy = Math.sin(angle) * randRange(0, 6);
+          spawnParticle(cx + ox, cy + oy, vx, vy);
+        }
+      }
+
+      // small ambient periodic spawns (very subtle)
+      let ambientTimer = 0;
+      function maybeAmbient(now) {
+        // every ~1.6 - 3s create a tiny drift somewhere near the center or edges
+        if (now - ambientTimer > randRange(1600, 3000)) {
+          ambientTimer = now;
+          // choose a random sector near center-ish
+          const cx = randRange(width * 0.25, width * 0.75);
+          const cy = randRange(height * 0.2, height * 0.8);
+          const n = Math.round(randRange(1, 4));
+          for (let i = 0; i < n; i++) {
+            spawnParticle(cx + randRange(-20,20), cy + randRange(-20,20), randRange(-0.4,0.4), randRange(-0.4,0.4));
+          }
         }
       }
 
@@ -234,32 +314,28 @@
       function loop(now) {
         const dt = now - last;
         last = now;
-        // clear (leave transparent black background)
         ctx.clearRect(0, 0, width, height);
+
+        // ambient spawns
+        maybeAmbient(now);
 
         // update & draw particles
         for (let i = particles.length - 1; i >= 0; i--) {
           const p = particles[i];
           p.age += dt;
           if (p.age >= p.life) {
-            // remove
             particles.splice(i, 1);
             continue;
           }
-          // update physics
           p.vx *= FRICTION;
           p.vy *= FRICTION;
-          p.x += p.vx * (dt / 16.67); // normalize per-frame (60fps base)
+          p.x += p.vx * (dt / 16.67);
           p.y += p.vy * (dt / 16.67);
 
-          // visual alpha: fade out over lifetime
           const alpha = 1 - (p.age / p.life);
-
-          // draw square with crisp edges (use integer coords)
           ctx.globalAlpha = alpha;
           ctx.fillStyle = `rgb(${p.rgb[0]},${p.rgb[1]},${p.rgb[2]})`;
           const s = Math.round(p.size);
-          // center the square at (p.x, p.y)
           ctx.fillRect(Math.round(p.x - s / 2), Math.round(p.y - s / 2), s, s);
         }
 
@@ -290,7 +366,6 @@
       window.addEventListener('touchmove', (e) => {
         if (!e.touches || !e.touches[0]) return;
         const t = e.touches[0];
-        // we cannot rely on movementX in touch, so compute from lastEvent
         let movementX = 0, movementY = 0;
         if (lastEvent && lastEvent.touches && lastEvent.touches[0]) {
           movementX = t.clientX - lastEvent.touches[0].clientX;
@@ -308,10 +383,57 @@
       function randRange(a, b) { return a + Math.random() * (b - a); }
       function lerp(a, b, t) { return a + (b - a) * t; }
 
-      // initialize
+      // initialize & entrance animations
+      function initEntrance() {
+        const container = document.getElementById('pageContainer');
+        const photo = document.getElementById('profilePhoto');
+        const text = document.getElementById('textContent');
+
+        // Wait a tick so CSS transitions run — apply show classes in staged manner
+        requestAnimationFrame(() => {
+          // small delay so burst can happen slightly before content appears
+          setTimeout(() => {
+            container.classList.add('show');
+            setTimeout(() => photo.classList.add('show'), 90);
+            setTimeout(() => text.classList.add('show'), 160);
+          }, 90);
+        });
+      }
+
+      // decide whether to run motion effects
+      const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      // initialize everything
       resize();
       window.addEventListener('resize', resize, { passive: true });
-      requestAnimationFrame(loop);
+
+      if (!reduceMotion) {
+        // burst from center on load & a gentle secondary burst near the photo
+        const cx = Math.round(width / 2);
+        const cy = Math.round(height / 3.5);
+        // small first-pop for "arriving" feeling
+        spawnBurst(cx, cy, 46, 4.6);
+        // second, subtle burst where the profile photo is (if available)
+        // attempt to compute photo center; fallback to center-bottom area
+        const photo = document.getElementById('profilePhoto');
+        let rect = photo && photo.getBoundingClientRect ? photo.getBoundingClientRect() : null;
+        if (rect) {
+          spawnBurst(rect.left + rect.width / 2, rect.top + rect.height / 2, 18, 2.6);
+        } else {
+          spawnBurst(width * 0.55, height * 0.45, 18, 2.6);
+        }
+
+        // start animation loop
+        requestAnimationFrame(loop);
+      } else {
+        // if reduced motion, don't run the particle loop and just show content
+        // but still start an empty loop to keep code stable (no drawing)
+        (function noMotionLoop(){ requestAnimationFrame(noMotionLoop); })();
+      }
+
+      // show content (CSS transitions)
+      initEntrance();
+
     })();
   </script>
 </body>

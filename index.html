@@ -28,20 +28,7 @@
       z-index: 0;              /* behind the page content */
       pointer-events: none;    /* won't block clicks */
       display:block;
-      background: radial-gradient(1200px 600px at 10% 10%, rgba(255,61,61,0.03), transparent 8%),
-                  radial-gradient(900px 400px at 90% 90%, rgba(255,145,77,0.02), transparent 10%);
-    }
-
-    /* subtle vignette */
-    body::after {
-      content: "";
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      z-index: 0;
-      background: radial-gradient(60% 60% at 50% 40%, rgba(255,255,255,0.02), transparent 30%),
-                  radial-gradient(100% 100% at 50% 80%, rgba(0,0,0,0.45), rgba(0,0,0,0.6));
-      mix-blend-mode: multiply;
+      background: transparent;
     }
 
     /* Page layout */
@@ -73,13 +60,13 @@
       object-fit: cover;
       border-radius: 12px;
       border: 1px solid rgba(255,255,255,0.06);
-      box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
       background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
       display:block;
       transform-origin: center;
-      transform: scale(0.9) rotate(-1.2deg);
+      transform: scale(0.96) rotate(-0.8deg);
       opacity: 0;
-      transition: transform 680ms cubic-bezier(.2,.9,.25,1), opacity 680ms cubic-bezier(.2,.9,.25,1);
+      transition: transform 520ms cubic-bezier(.2,.9,.25,1), opacity 520ms cubic-bezier(.2,.9,.25,1);
     }
 
     .photo.show {
@@ -97,7 +84,7 @@
       transform-origin: left top;
       opacity: 0;
       transform: translateY(6px);
-      transition: opacity 680ms cubic-bezier(.2,.9,.25,1) 140ms, transform 680ms cubic-bezier(.2,.9,.25,1) 140ms;
+      transition: opacity 520ms cubic-bezier(.2,.9,.25,1) 120ms, transform 520ms cubic-bezier(.2,.9,.25,1) 120ms;
     }
 
     .content.show {
@@ -117,7 +104,7 @@
       font-size: 15px;
     }
 
-    /* Gradient-accent links with subtle shimmer */
+    /* Gradient-accent links */
     .accent-link {
       background: var(--accent-gradient);
       -webkit-background-clip: text;
@@ -125,11 +112,7 @@
       background-clip: text;
       color: transparent;
       font-weight: 600;
-      background-size: 200% 100%;
-      background-position: 0% 50%;
-      transition: background-position 900ms linear;
     }
-    .accent-link:hover { background-position: 100% 50%; }
     a.accent-link:visited { opacity: 0.95; }
 
     /* Lists */
@@ -151,7 +134,6 @@
     @media (prefers-reduced-motion: reduce) {
       canvas#bgCanvas { display: none; }
       .container, .photo, .content { transition: none; transform: none; opacity: 1 !important; }
-      body::after { display:none; }
     }
   </style>
 </head>
@@ -218,11 +200,11 @@
       const ctx = canvas.getContext('2d', { alpha: true });
 
       // ---------- Tweak these to change the effect ----------
-      const SPAWN_COUNT = 3;        // how many squares to spawn per mousemove event (1-6) — fixed per event
+      const SPAWN_COUNT = 3;        // how many squares to spawn per mousemove event (1-6)
       const PARTICLE_MIN_SIZE = 6;  // px (small squares)
       const PARTICLE_MAX_SIZE = 12; // px
       const LIFESPAN_MIN = 300;     // ms
-      const LIFESPAN_MAX = 700;     // ms <-- matches your original
+      const LIFESPAN_MAX = 700;     // ms
       const MAX_PARTICLES = 800;    // cap for performance
       const FRICTION = 0.86;        // how quickly particles slow
       // -----------------------------------------------------
@@ -230,6 +212,7 @@
       let DPR = Math.max(window.devicePixelRatio || 1, 1);
       let width = 0, height = 0;
       let particles = [];
+      let lastMouse = { x: -9999, y: -9999, t: performance.now() };
 
       function resize() {
         DPR = Math.max(window.devicePixelRatio || 1, 1);
@@ -265,12 +248,16 @@
         });
       }
 
-      // RESTORED: spawn several based on fixed SPAWN_COUNT (like your original)
+      // spawn several based on movement speed and SPAWN_COUNT
+      // EXACT original velocity math restored here
       function handleMove(clientX, clientY, movementX, movementY) {
+        // spawn a few squares at and near the pointer
+        const speed = Math.sqrt(movementX * movementX + movementY * movementY);
         for (let i = 0; i < SPAWN_COUNT; i++) {
+          // slight random offset so squares don't overlap exactly
           const ox = randRange(-4, 4);
           const oy = randRange(-4, 4);
-          // velocity influenced by mouse movement for trailing
+          // velocity influenced by mouse movement for trailing (original factor)
           const vx = movementX * 0.15 + randRange(-0.6, 0.6);
           const vy = movementY * 0.15 + randRange(-0.6, 0.6);
           spawnParticle(clientX + ox, clientY + oy, vx, vy);
@@ -304,35 +291,39 @@
         }
       }
 
-      // animation frame
+      // animation frame (draw logic restored to original)
       let last = performance.now();
       function loop(now) {
         const dt = now - last;
         last = now;
+        // clear (leave transparent black background)
         ctx.clearRect(0, 0, width, height);
 
         maybeAmbient(now);
 
+        // update & draw particles
         for (let i = particles.length - 1; i >= 0; i--) {
           const p = particles[i];
           p.age += dt;
           if (p.age >= p.life) {
+            // remove
             particles.splice(i, 1);
             continue;
           }
           // update physics
           p.vx *= FRICTION;
           p.vy *= FRICTION;
-          p.x += p.vx * (dt / 16.67);
+          p.x += p.vx * (dt / 16.67); // normalize per-frame (60fps base)
           p.y += p.vy * (dt / 16.67);
 
-          // visual alpha: fade out over lifetime
+          // visual alpha: fade out over lifetime (original)
           const alpha = 1 - (p.age / p.life);
 
           // draw square with crisp edges (use integer coords)
-          ctx.globalAlpha = Math.min(1, alpha * 1.05);
+          ctx.globalAlpha = alpha;
           ctx.fillStyle = `rgb(${p.rgb[0]},${p.rgb[1]},${p.rgb[2]})`;
           const s = Math.round(p.size);
+          // center the square at (p.x, p.y)
           ctx.fillRect(Math.round(p.x - s / 2), Math.round(p.y - s / 2), s, s);
         }
 
@@ -340,7 +331,7 @@
         requestAnimationFrame(loop);
       }
 
-      // pointer events
+      // pointer events (kept same as original)
       let lastEvent = null;
       window.addEventListener('mousemove', (e) => {
         const mx = e.clientX;
@@ -363,6 +354,7 @@
       window.addEventListener('touchmove', (e) => {
         if (!e.touches || !e.touches[0]) return;
         const t = e.touches[0];
+        // we cannot rely on movementX in touch, so compute from lastEvent
         let movementX = 0, movementY = 0;
         if (lastEvent && lastEvent.touches && lastEvent.touches[0]) {
           movementX = t.clientX - lastEvent.touches[0].clientX;
@@ -380,7 +372,7 @@
       function randRange(a, b) { return a + Math.random() * (b - a); }
       function lerp(a, b, t) { return a + (b - a) * t; }
 
-      // initialize & entrance animations
+      // initialize & entrance animations (kept)
       function initEntrance() {
         const container = document.getElementById('pageContainer');
         const photo = document.getElementById('profilePhoto');
